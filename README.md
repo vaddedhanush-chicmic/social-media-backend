@@ -1,98 +1,232 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 📱 Social Media Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A robust, scalable RESTful API backend for a social media platform, built with **NestJS**, **MongoDB**, and **TypeScript**. Features JWT-based authentication, rate limiting, email services, and full Swagger API documentation.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🛠️ Tech Stack
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+| Layer | Technology |
+|---|---|
+| Framework | NestJS 11 |
+| Language | TypeScript 5 |
+| Database | MongoDB (via Mongoose) |
+| Auth | JWT (Access + Refresh tokens), Passport.js |
+| Caching / Sessions | ioredis (Redis) |
+| Email | Nodemailer + @nestjs-modules/mailer (EJS templates) |
+| API Docs | Swagger / OpenAPI |
+| Rate Limiting | @nestjs/throttler |
+| Validation | class-validator + class-transformer |
+| Sanitization | sanitize-html |
+| Testing | Jest + Supertest |
+| Linting / Formatting | ESLint + Prettier |
 
-## Project setup
+---
 
-```bash
-$ npm install
-```
+## 🚀 Getting Started
 
-## Compile and run the project
+### Prerequisites
 
-```bash
-# development
-$ npm run start
+- **Node.js** ≥ 18
+- **npm** ≥ 9
+- **MongoDB** (local or Atlas)
+- **Redis** (for session/token caching)
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+### Installation
 
 ```bash
-# unit tests
-$ npm run test
+# Clone the repository
+git clone https://github.com/vaddedhanush-chicmic/social-media-backend.git
+cd social-media-backend
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Install dependencies
+npm install
 ```
 
-## Deployment
+### Environment Configuration
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Copy the example environment file and fill in your values:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+cp .env.example .env
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**Application**
 
-## Resources
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Server port | `3000` |
+| `NODE_ENV` | Environment (`development` / `production`) | `development` |
+| `API_PREFIX` | Global API route prefix | `api/v1` |
 
-Check out a few resources that may come in handy when working with NestJS:
+**MongoDB**
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+| Variable | Description | Default |
+|---|---|---|
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/social-media-db` |
 
-## Support
+**JWT**
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+| Variable | Description | Default |
+|---|---|---|
+| `JWT_ACCESS_SECRET` | Secret key for signing access tokens | _(required)_ |
+| `JWT_ACCESS_EXPIRATION` | Access token expiry duration | `1d` |
 
-## Stay in touch
+**Rate Limiting (Redis-backed)**
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+| Variable | Description | Default |
+|---|---|---|
+| `RATE_LIMIT_TTL` | Rate limit window in milliseconds | `60000` |
+| `RATE_LIMIT_MAX` | Max requests per window per IP | `10` |
 
-## License
+**Redis**
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Variable | Description | Default |
+|---|---|---|
+| `REDIS_HOST` | Redis server hostname | `localhost` |
+| `REDIS_PORT` | Redis server port | `6379` |
+
+**Mail**
+
+| Variable | Description | Default |
+|---|---|---|
+| `MAIL_HOST` | SMTP host | `smtp.ethereal.email` |
+| `MAIL_PORT` | SMTP port | `587` |
+| `MAIL_USER` | SMTP username | _(required)_ |
+| `MAIL_PASS` | SMTP password | _(required)_ |
+| `MAIL_FROM` | Sender address | `noreply@socialapp.com` |
+
+---
+
+## 🏃 Running the App
+
+```bash
+# Development (standard)
+npm run start
+
+# Development (watch mode — auto-restarts on file changes)
+npm run start:dev
+
+# Debug mode
+npm run start:debug
+
+# Production
+npm run build
+npm run start:prod
+```
+
+The server will start at `http://localhost:3000` (or the `PORT` you configured).
+
+---
+
+## 📖 API Documentation
+
+Swagger UI is available once the server is running:
+
+```
+http://localhost:3000/api/v1/docs
+```
+
+All endpoints, request/response schemas, and authentication flows are documented there.
+
+---
+
+## 🔐 Authentication Flow
+
+This project uses **JWT access tokens** for stateless authentication:
+
+1. **Login** → receive an **access token** (default expiry: `1d`).
+2. Include it in the `Authorization: Bearer <token>` header on all protected routes.
+3. Tokens are validated via `passport-jwt` and `@nestjs/passport`.
+
+> **Note:** The current configuration uses a single access token. Refresh token support can be added by introducing `JWT_REFRESH_SECRET` and `JWT_REFRESH_EXPIRATION` variables.
+
+---
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm run test
+
+# Unit tests in watch mode
+npm run test:watch
+
+# End-to-end tests
+npm run test:e2e
+
+# Test coverage report
+npm run test:cov
+```
+
+---
+
+## 📁 Project Structure
+
+```
+social-media-backend/
+├── src/                    # Application source code
+│   ├── app.module.ts       # Root module
+│   ├── main.ts             # Entry point (bootstraps NestJS app)
+│   └── ...                 # Feature modules (users, auth, posts, etc.)
+├── test/                   # E2E test files
+├── .env.example            # Environment variable template
+├── .prettierrc             # Prettier formatting config
+├── eslint.config.mjs       # ESLint config
+├── nest-cli.json           # NestJS CLI config
+├── tsconfig.json           # TypeScript base config
+└── tsconfig.build.json     # TypeScript build config
+```
+
+---
+
+## 🧹 Code Quality
+
+```bash
+# Lint and auto-fix
+npm run lint
+
+# Format code with Prettier
+npm run format
+```
+
+The project enforces consistent code style via ESLint (with Prettier integration) and TypeScript strict mode.
+
+---
+
+## 🔒 Security Features
+
+- **Rate Limiting** — Redis-backed rate limiting guards against abuse (configurable via `RATE_LIMIT_TTL` and `RATE_LIMIT_MAX`).
+- **Input Sanitization** — `sanitize-html` strips dangerous HTML from user input.
+- **Password Hashing** — `bcrypt` is used for secure password storage.
+- **JWT Secrets** — Access and refresh tokens use separate signing secrets to limit blast radius on key exposure.
+
+---
+
+## 📦 Key Dependencies
+
+| Package | Purpose |
+|---|---|
+| `@nestjs/mongoose` | MongoDB ODM integration |
+| `@nestjs/jwt` + `passport-jwt` | JWT authentication |
+| `@nestjs/swagger` | Auto-generated API docs |
+| `@nestjs/throttler` | Request rate limiting |
+| `@nestjs-modules/mailer` + `ejs` | Transactional email with HTML templates |
+| `ioredis` | Redis client for caching/sessions |
+| `bcrypt` | Password hashing |
+| `class-validator` | DTO validation decorators |
+| `sanitize-html` | HTML sanitization |
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/<feature-name>`
+3. Commit your changes: `git commit -m "feat: add <feature-name>"`
+4. Push to the branch: `git push origin feat/<feature-name>`
+5. Open a Pull Request
+
+Please follow the existing branch naming convention (`feat/`, `fix/`, `chore/`).
+
+---
