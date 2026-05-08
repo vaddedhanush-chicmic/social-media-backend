@@ -1,4 +1,5 @@
 import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as express from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -24,7 +25,12 @@ export class AuthService {
 
     const existingUser = await this.usersService.findByEmailOrUsername(email, username);
     if (existingUser) {
-      throw new ConflictException('User with this email or username already exists');
+      if (!existingUser.isEmailVerified) {
+        // Delete unverified user to allow re-registration
+        await this.usersService.delete(existingUser._id.toString());
+      } else {
+        throw new ConflictException('User with this email or username already exists');
+      }
     }
 
     const hashedPassword = await this.hashData(password);
@@ -138,20 +144,48 @@ export class AuthService {
     return { message: 'Password reset token sent to email' };
   }
 
-  async resetPassword(resetPasswordDto: any) {
-    const { token, newPassword } = resetPasswordDto;
+  async verifyResetToken(token: string, response: express.Response) {
     const user = await this.usersRepository.findByResetToken(token);
-
     if (!user) {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
 
-    const hashedPassword = await this.hashData(newPassword);
+    // Store token in httpOnly cookie - JS cannot read this
+    response.cookie('reset_session', token, {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 600000, // 10 minutes
+    });
+
+    return { message: 'Reset token is valid' };
+  }
+
+  async resetPassword(token: string, resetPasswordDto: any, response: express.Response) {
+    if (!token) {
+      throw new UnauthorizedException('No reset session found. Please verify your token first.');
+    }
+
+    const { password, confirmPassword } = resetPasswordDto;
+    
+    if (password !== confirmPassword) {
+      throw new ConflictException('Passwords do not match');
+    }
+
+    const user = await this.usersRepository.findByResetToken(token);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    const hashedPassword = await this.hashData(password);
     await this.usersService.update(user._id.toString(), {
       password: hashedPassword,
       resetPasswordToken: null,
       resetPasswordExpires: null,
     });
+
+    // Clear the cookie after successful reset
+    response.clearCookie('reset_session');
 
     return { message: 'Password reset successful' };
   }

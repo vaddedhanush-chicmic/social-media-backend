@@ -35,10 +35,6 @@ export class CreateProfileDto {
   @IsOptional()
   bio?: string;
 
-  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
-  @IsUrl()
-  @IsOptional()
-  avatarUrl?: string;
 
   @ApiPropertyOptional({ example: ['coding', 'traveling', 'music'] })
   @IsArray()

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { UserDocument } from './schemas/user.schema';
 import { ProfileDocument } from './schemas/profile.schema';
@@ -40,6 +40,11 @@ export class UsersService {
 
   // Profile Management
   async createProfile(userId: string, profileData: any): Promise<ProfileDocument> {
+    const existingProfile = await this.usersRepository.findProfileByUserId(userId);
+    if (existingProfile) {
+      throw new ConflictException('Profile already exists for this user');
+    }
+
     return this.usersRepository.createProfile({
       ...profileData,
       userId: userId as any,
@@ -63,16 +68,22 @@ export class UsersService {
     return profile;
   }
 
-  async findByUsername(username: string): Promise<ProfileDocument> {
+  async findByUsername(username: string, requestingUserId?: string): Promise<ProfileDocument> {
     const user = await this.usersRepository.findActiveByUsername(username);
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
+    const isOwnProfile = user._id.toString() === requestingUserId;
+    
+    // Self view gets full info, public view gets restricted info
+    const userFields = isOwnProfile ? 'username email' : 'username -_id';
+    const profileFields = isOwnProfile ? '' : '-__v -isComplete -updatedAt';
+
     const profile = await this.usersRepository.findProfileByUserId(
       user._id.toString(), 
-      'username -_id', 
-      '-__v -isComplete -updatedAt'
+      userFields, 
+      profileFields
     );
     if (!profile) {
       throw new NotFoundException('Profile not found');
@@ -106,6 +117,12 @@ export class UsersService {
   }
 
   async removeAvatar(userId: string): Promise<ProfileDocument> {
+    const profile = await this.usersRepository.findProfileByUserId(userId);
+    if (!profile?.avatarUrl) {
+      throw new BadRequestException('User does not have an avatar');
+    }
+
+    // Note: In the next phase, we will add Cloud Storage (S3/Cloudinary) file deletion here
     return this.updateProfile(userId, { avatarUrl: null });
   }
 

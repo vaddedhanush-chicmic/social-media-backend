@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -9,6 +10,9 @@ async function bootstrap() {
 
   // Global Prefix
   app.setGlobalPrefix(configService.get<string>('app.apiPrefix') || 'api/v1');
+
+  // Cookies
+  app.use(cookieParser());
 
   // Swagger Configuration
   const config = new DocumentBuilder()

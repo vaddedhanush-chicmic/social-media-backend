@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, Req, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import * as express from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -8,7 +9,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SearchUserDto } from './dto/search-user.dto';
-import { UpdateAvatarDto } from './dto/update-avatar.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -26,11 +26,6 @@ export class UsersController {
     return this.usersService.createProfile(userId, profileData);
   }
 
-  @Get('me')
-  @ApiOperation({ summary: 'Get own profile' })
-  async getMe(@CurrentUser('userId') userId: string) {
-    return this.usersService.getProfile(userId);
-  }
 
   @Patch('me')
   @ApiOperation({ summary: 'Update own profile' })
@@ -47,19 +42,61 @@ export class UsersController {
     return this.usersService.softDelete(userId);
   }
 
-  @Post('me/avatar')
-  @ApiOperation({ summary: 'Update avatar' })
-  async updateAvatar(
+  @Post('me/fileupload')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'type', enum: ['avatar'], required: true, description: 'The type of file being uploaded' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Universal file upload' })
+  async uploadFile(
     @CurrentUser('userId') userId: string,
-    @Body() updateAvatarDto: UpdateAvatarDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('type') type: string,
   ) {
-    return this.usersService.updateAvatar(userId, updateAvatarDto.avatarUrl);
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Note: In the next phase, we will add Cloud Storage (S3/Cloudinary) here
+    const mockUrl = `https://storage.com/uploads/${Date.now()}-${file.originalname}`;
+
+    if (type === 'avatar') {
+      await this.usersService.updateAvatar(userId, mockUrl);
+      return { 
+        message: 'Avatar updated successfully', 
+        url: mockUrl,
+        type 
+      };
+    }
+
+    return { 
+      message: 'File uploaded successfully (Generic)', 
+      type, 
+      fileName: file.originalname 
+    };
   }
 
-  @Delete('me/avatar')
-  @ApiOperation({ summary: 'Remove avatar' })
-  async removeAvatar(@CurrentUser('userId') userId: string) {
-    return this.usersService.removeAvatar(userId);
+  @Delete('me/fileupload')
+  @ApiQuery({ name: 'type', enum: ['avatar'], required: true, description: 'The type of file to remove' })
+  @ApiOperation({ summary: 'Remove uploaded file (e.g. avatar)' })
+  async removeFile(
+    @CurrentUser('userId') userId: string,
+    @Query('type') type: string,
+  ) {
+    if (type === 'avatar') {
+      return this.usersService.removeAvatar(userId);
+    }
+    throw new BadRequestException('Invalid file type for removal');
   }
 
   @Get('search')
@@ -68,11 +105,13 @@ export class UsersController {
     return this.usersService.searchUsers(searchUserDto.query);
   }
 
-  @Public()
   @Get(':username')
-  @ApiOperation({ summary: 'View public profile' })
-  async getPublicProfile(@Param('username') username: string) {
-    return this.usersService.findByUsername(username);
+  @ApiOperation({ summary: 'View profile (Self or Public)' })
+  async getProfile(
+    @Param('username') username: string,
+    @CurrentUser('userId') userId?: string,
+  ) {
+    return this.usersService.findByUsername(username, userId);
   }
 
   @Post('deactivate')

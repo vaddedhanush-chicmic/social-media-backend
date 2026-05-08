@@ -2,10 +2,6 @@ import { IsNotEmpty, IsString, MinLength, MaxLength, Matches } from 'class-valid
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ResetPasswordDto {
-  @ApiProperty({ example: 'your-reset-token', description: 'The token sent to your email' })
-  @IsString()
-  @IsNotEmpty()
-  token: string;
 
   @ApiProperty({ example: 'NewPassword123!', description: 'Your new strong password' })
   @IsString()
@@ -15,5 +11,10 @@ export class ResetPasswordDto {
   @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
     message: 'Password is too weak. It must contain at least one uppercase letter, one lowercase letter, and one number or special character.',
   })
-  newPassword: string;
+  password: string;
+
+  @ApiProperty({ example: 'NewPassword123!', description: 'Confirm your new password' })
+  @IsString()
+  @IsNotEmpty()
+  confirmPassword: string;
 }
