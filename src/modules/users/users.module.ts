@@ -9,6 +9,9 @@ import { Profile, ProfileSchema } from './schemas/profile.schema';
 import { RedisModule } from '../../database/redis.module';
 import { JwtModule } from '@nestjs/jwt';
 
+import { FollowsModule } from '../follows/follows.module';
+import { forwardRef } from '@nestjs/common';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -17,6 +20,7 @@ import { JwtModule } from '@nestjs/jwt';
     ]),
     RedisModule,
     JwtModule,
+    forwardRef(() => FollowsModule),
   ],
   controllers: [UsersController],
   providers: [UsersService, UsersRepository],
