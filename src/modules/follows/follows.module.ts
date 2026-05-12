@@ -32,6 +32,6 @@ import { forwardRef } from '@nestjs/common';
     FollowsService,
     FollowsRepository,
   ],
-  exports: [FollowsService],
+  exports: [FollowsService, FollowsRepository],
 })
 export class FollowsModule {}
