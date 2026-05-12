@@ -8,6 +8,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdatePrivacyDto } from './dto/update-privacy.dto';
 import { SearchUserDto } from './dto/search-user.dto';
 
 @ApiTags('users')
@@ -42,6 +43,15 @@ export class UsersController {
     return this.usersService.softDelete(userId);
   }
 
+  @Patch('me/privacy')
+  @ApiOperation({ summary: 'Toggle account privacy (Public/Private)' })
+  async updatePrivacy(
+    @CurrentUser('userId') userId: string,
+    @Body() updatePrivacyDto: UpdatePrivacyDto,
+  ) {
+    return this.usersService.updatePrivacy(userId, updatePrivacyDto.isPrivate);
+  }
+
   @Post('me/fileupload')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -67,7 +77,7 @@ export class UsersController {
       throw new BadRequestException('No file uploaded');
     }
 
-    // Note: In the next phase, we will add Cloud Storage (S3/Cloudinary) here
+    // Note: we will add Cloud Storage (S3/Cloudinary) here
     const mockUrl = `https://storage.com/uploads/${Date.now()}-${file.originalname}`;
 
     if (type === 'avatar') {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { UserSchema } from '../users/schemas/user.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import {
@@ -9,7 +10,6 @@ import {
 import { FollowsController } from './follows.controller';
 import { FollowsService } from './follows.service';
 import { FollowsRepository } from './follows.repository';
-
 import { UsersModule } from '../users/users.module';
 import { forwardRef } from '@nestjs/common';
 
@@ -19,6 +19,10 @@ import { forwardRef } from '@nestjs/common';
       {
         name: Follow.name,
         schema: FollowSchema,
+      },
+      {
+        name: 'User',
+        schema: UserSchema,
       },
     ]),
     forwardRef(() => UsersModule),

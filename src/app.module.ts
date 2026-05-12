@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -19,6 +20,7 @@ import mongoConfig from './config/mongo.config';
       load: [appConfig, jwtConfig, mongoConfig],
     }),
     DatabaseModule,
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     CommonModule,

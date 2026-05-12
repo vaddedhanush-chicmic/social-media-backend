@@ -130,6 +130,26 @@ export class UsersService {
     return this.usersRepository.update(id, { isActive: true, deactivatedAt: null });
   }
 
+  async updatePrivacy(userId: string, isPrivate: boolean): Promise<any> {
+    const user = await this.usersRepository.update(userId, { isPrivate });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // If switching to Public, auto-accept all pending requests
+    if (!isPrivate) {
+      const pendingRequests = await this.followsService.getPendingRequests(userId, 1000);
+      for (const request of pendingRequests.data) {
+        await this.followsService.acceptRequest(userId, request.userId.toString());
+      }
+    }
+
+    return { 
+      message: `Account is now ${isPrivate ? 'Private' : 'Public'}`,
+      isPrivate 
+    };
+  }
+
   async updateAvatar(userId: string, avatarUrl: string): Promise<ProfileDocument> {
     return this.updateProfile(userId, { avatarUrl });
   }
@@ -140,7 +160,7 @@ export class UsersService {
       throw new BadRequestException('User does not have an avatar');
     }
 
-    // Note: In the next phase, we will add Cloud Storage (S3/Cloudinary) file deletion here
+    // Note: we will add Cloud Storage (S3/Cloudinary) file deletion here
     return this.updateProfile(userId, { avatarUrl: null });
   }
 

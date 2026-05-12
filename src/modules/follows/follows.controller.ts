@@ -107,9 +107,55 @@ export class FollowsController {
         return this.followsService.getFollowStatus(currentUserId, targetUserId);
     }
 
+    @Get(':userId/mutuals')
+    @ApiOperation({ summary: 'Get mutual followers' })
+    mutuals(
+        @CurrentUser('userId') currentUserId: string,
+        @Param('userId', ParseObjectIdPipe) targetUserId: string,
+        @Query() query: FollowQueryDto,
+    ) {
+        return this.followsService.getMutualFollowers(
+            targetUserId,
+            query.limit || 10,
+            currentUserId,
+            query.cursor,
+        );
+    }
+
+    @Delete(':userId/remove')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Silently remove a follower' })
+    @ApiParam({ name: 'userId', description: 'ID of the follower to remove' })
+    remove(
+        @CurrentUser('userId') currentUserId: string,
+        @Param('userId', ParseObjectIdPipe) targetUserId: string,
+    ) {
+        return this.followsService.removeFollower(currentUserId, targetUserId);
+    }
+
     @Get('requests/pending')
     @ApiOperation({ summary: 'Get incoming pending follow requests' })
-    pending(@CurrentUser('userId') currentUserId: string) {
-        return this.followsService.getPendingRequests(currentUserId);
+    pending(
+        @CurrentUser('userId') currentUserId: string,
+        @Query() query: FollowQueryDto,
+    ) {
+        return this.followsService.getPendingRequests(
+            currentUserId,
+            query.limit || 10,
+            query.cursor,
+        );
+    }
+
+    @Get('requests/sent')
+    @ApiOperation({ summary: 'Get outgoing pending follow requests' })
+    sent(
+        @CurrentUser('userId') currentUserId: string,
+        @Query() query: FollowQueryDto,
+    ) {
+        return this.followsService.getSentRequests(
+            currentUserId,
+            query.limit || 10,
+            query.cursor,
+        );
     }
 }

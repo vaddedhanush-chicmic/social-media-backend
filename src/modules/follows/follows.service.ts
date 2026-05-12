@@ -48,8 +48,8 @@ export class FollowsService {
     });
 
     if (status === 'active') {
-      await this.usersRepository.update(currentUserId, { $inc: { followingCount: 1 } });
-      await this.usersRepository.update(targetUserId, { $inc: { followersCount: 1 } });
+      await this.usersRepository.incrementFollowing(currentUserId);
+      await this.usersRepository.incrementFollowers(targetUserId);
     }
 
     return {
@@ -68,8 +68,8 @@ export class FollowsService {
     }
 
     if (relation.status === 'active') {
-      await this.usersRepository.update(currentUserId, { $inc: { followingCount: -1 } });
-      await this.usersRepository.update(targetUserId, { $inc: { followersCount: -1 } });
+      await this.usersRepository.decrementFollowing(currentUserId);
+      await this.usersRepository.decrementFollowers(targetUserId);
     }
 
     return { message: 'User unfollowed successfully' };
@@ -88,8 +88,8 @@ export class FollowsService {
     relation.status = 'active';
     await relation.save();
 
-    await this.usersRepository.update(requesterId, { $inc: { followingCount: 1 } });
-    await this.usersRepository.update(currentUserId, { $inc: { followersCount: 1 } });
+    await this.usersRepository.incrementFollowing(requesterId);
+    await this.usersRepository.incrementFollowers(currentUserId);
 
     return { message: 'Follow request accepted' };
   }
@@ -116,20 +116,21 @@ export class FollowsService {
       }
     }
 
-    const followers = await this.followsRepository.getFollowers(userId, limit + 1, cursor);
-    const hasMore = followers.length > limit;
-    const rawData = hasMore ? followers.slice(0, limit) : followers;
-    
-    const data = rawData.map(f => {
-      const follow = f.toObject();
-      const user = follow.follower_id;
-      return {
-        _id: follow._id,
-        ...(typeof user === 'object' ? user : {}),
-      };
-    });
+    const data = await this.followsRepository.getFollowers(
+      userId,
+      limit + 1,
+      requestingUserId,
+      cursor,
+    );
 
-    return { data, nextCursor: hasMore ? data[data.length - 1]._id : null, hasMore };
+    const hasMore = data.length > limit;
+    const finalData = hasMore ? data.slice(0, limit) : data;
+
+    return {
+      data: finalData,
+      nextCursor: hasMore ? finalData[finalData.length - 1]._id : null,
+      hasMore,
+    };
   }
 
   async getFollowing(
@@ -149,20 +150,44 @@ export class FollowsService {
       }
     }
 
-    const following = await this.followsRepository.getFollowing(userId, limit + 1, cursor);
-    const hasMore = following.length > limit;
-    const rawData = hasMore ? following.slice(0, limit) : following;
+    const data = await this.followsRepository.getFollowing(
+      userId,
+      limit + 1,
+      requestingUserId,
+      cursor,
+    );
 
-    const data = rawData.map(f => {
-      const follow = f.toObject();
-      const user = follow.following_id;
-      return {
-        _id: follow._id,
-        ...(typeof user === 'object' ? user : {}),
-      };
-    });
+    const hasMore = data.length > limit;
+    const finalData = hasMore ? data.slice(0, limit) : data;
 
-    return { data, nextCursor: hasMore ? data[data.length - 1]._id : null, hasMore };
+    return {
+      data: finalData,
+      nextCursor: hasMore ? finalData[finalData.length - 1]._id : null,
+      hasMore,
+    };
+  }
+
+  async getMutualFollowers(
+    targetUserId: string,
+    limit: number,
+    requestingUserId: string,
+    cursor?: string,
+  ) {
+    const data = await this.followsRepository.getMutualFollowers(
+      targetUserId,
+      requestingUserId,
+      limit + 1,
+      cursor,
+    );
+
+    const hasMore = data.length > limit;
+    const finalData = hasMore ? data.slice(0, limit) : data;
+
+    return {
+      data: finalData,
+      nextCursor: hasMore ? finalData[finalData.length - 1]._id : null,
+      hasMore,
+    };
   }
 
   async getFollowStatus(currentUserId: string, targetUserId: string) {
@@ -176,7 +201,57 @@ export class FollowsService {
     };
   }
 
-  getPendingRequests(userId: string) {
-    return this.followsRepository.getPendingRequests(userId);
+  async removeFollower(currentUserId: string, targetUserId: string) {
+    const relation = await this.followsRepository.deleteRelation(
+      targetUserId, // Follower to remove
+      currentUserId, // You are being followed
+    );
+
+    if (!relation) {
+      throw new NotFoundException('Follower not found');
+    }
+
+    if (relation.status === 'active') {
+      await this.usersRepository.update(currentUserId, { $inc: { followersCount: -1 } });
+      await this.usersRepository.update(targetUserId, { $inc: { followingCount: -1 } });
+    }
+
+    return { message: 'Follower removed successfully' };
+  }
+
+  async getPendingRequests(userId: string, limit: number, cursor?: string) {
+    const requests = await this.followsRepository.getPendingRequests(userId, limit + 1, cursor);
+    const hasMore = requests.length > limit;
+    const rawData = hasMore ? requests.slice(0, limit) : requests;
+
+    const data = rawData.map(f => {
+      const follow = f.toObject();
+      const user = follow.follower_id;
+      return {
+        _id: follow._id, // Relation ID
+        userId: (user as any)._id, // Explicit User ID
+        username: (user as any).username,
+      };
+    });
+
+    return { data, nextCursor: hasMore ? data[data.length - 1]._id : null, hasMore };
+  }
+
+  async getSentRequests(userId: string, limit: number, cursor?: string) {
+    const requests = await this.followsRepository.getSentRequests(userId, limit + 1, cursor);
+    const hasMore = requests.length > limit;
+    const rawData = hasMore ? requests.slice(0, limit) : requests;
+
+    const data = rawData.map(f => {
+      const follow = f.toObject();
+      const user = follow.following_id;
+      return {
+        _id: follow._id, // Relation ID
+        userId: (user as any)._id, // Explicit User ID
+        username: (user as any).username,
+      };
+    });
+
+    return { data, nextCursor: hasMore ? data[data.length - 1]._id : null, hasMore };
   }
 }
