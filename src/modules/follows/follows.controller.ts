@@ -24,6 +24,32 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class FollowsController {
     constructor(private readonly followsService: FollowsService) { }
 
+    @Get('requests/pending')
+    @ApiOperation({ summary: 'Get incoming pending follow requests' })
+    pending(
+        @CurrentUser('userId') currentUserId: string,
+        @Query() query: FollowQueryDto,
+    ) {
+        return this.followsService.getPendingRequests(
+            currentUserId,
+            query.limit || 10,
+            query.cursor,
+        );
+    }
+
+    @Get('requests/sent')
+    @ApiOperation({ summary: 'Get outgoing pending follow requests' })
+    sent(
+        @CurrentUser('userId') currentUserId: string,
+        @Query() query: FollowQueryDto,
+    ) {
+        return this.followsService.getSentRequests(
+            currentUserId,
+            query.limit || 10,
+            query.cursor,
+        );
+    }
+    
     @Post(':userId')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Follow a user' })
@@ -133,29 +159,5 @@ export class FollowsController {
         return this.followsService.removeFollower(currentUserId, targetUserId);
     }
 
-    @Get('requests/pending')
-    @ApiOperation({ summary: 'Get incoming pending follow requests' })
-    pending(
-        @CurrentUser('userId') currentUserId: string,
-        @Query() query: FollowQueryDto,
-    ) {
-        return this.followsService.getPendingRequests(
-            currentUserId,
-            query.limit || 10,
-            query.cursor,
-        );
-    }
 
-    @Get('requests/sent')
-    @ApiOperation({ summary: 'Get outgoing pending follow requests' })
-    sent(
-        @CurrentUser('userId') currentUserId: string,
-        @Query() query: FollowQueryDto,
-    ) {
-        return this.followsService.getSentRequests(
-            currentUserId,
-            query.limit || 10,
-            query.cursor,
-        );
-    }
 }
