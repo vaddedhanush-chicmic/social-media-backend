@@ -55,6 +55,28 @@ export class UsersRepository {
     return this.userModel.findByIdAndUpdate(id, updateData, { returnDocument: 'after' }).exec();
   }
 
+  async incrementFollowers(userId: string) {
+    return this.userModel.findByIdAndUpdate(userId, { $inc: { followersCount: 1 } }).exec();
+  }
+
+  async decrementFollowers(userId: string) {
+    return this.userModel.findOneAndUpdate(
+      { _id: userId, followersCount: { $gt: 0 } },
+      { $inc: { followersCount: -1 } },
+    ).exec();
+  }
+
+  async incrementFollowing(userId: string) {
+    return this.userModel.findByIdAndUpdate(userId, { $inc: { followingCount: 1 } }).exec();
+  }
+
+  async decrementFollowing(userId: string) {
+    return this.userModel.findOneAndUpdate(
+      { _id: userId, followingCount: { $gt: 0 } },
+      { $inc: { followingCount: -1 } },
+    ).exec();
+  }
+
   async delete(id: string): Promise<any> {
     return this.userModel.findByIdAndDelete(id).exec();
   }

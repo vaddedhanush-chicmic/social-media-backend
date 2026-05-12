@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { UserDocument } from './schemas/user.schema';
 import { ProfileDocument } from './schemas/profile.schema';
 import { RedisService } from '../../database/redis.service';
 import { JwtService } from '@nestjs/jwt';
+import { FollowsService } from '../follows/follows.service';
 
 @Injectable()
 export class UsersService {
@@ -11,6 +12,8 @@ export class UsersService {
     private usersRepository: UsersRepository,
     private redisService: RedisService,
     private jwtService: JwtService,
+    @Inject(forwardRef(() => FollowsService))
+    private followsService: FollowsService,
   ) {}
 
   async create(userData: any): Promise<UserDocument> {
@@ -68,17 +71,27 @@ export class UsersService {
     return profile;
   }
 
-  async findByUsername(username: string, requestingUserId?: string): Promise<ProfileDocument> {
+  async findByUsername(username: string, requestingUserId?: string): Promise<any> {
     const user = await this.usersRepository.findActiveByUsername(username);
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     const isOwnProfile = user._id.toString() === requestingUserId;
+    let isFollowing = false;
+
+    if (!isOwnProfile && requestingUserId) {
+      const status = await this.followsService.getFollowStatus(requestingUserId, user._id.toString());
+      isFollowing = status.isFollowing && !status.isPending;
+    }
+
+    const isPrivate = user.isPrivate && !isOwnProfile && !isFollowing;
     
-    // Self view gets full info, public view gets restricted info
-    const userFields = isOwnProfile ? 'username email' : 'username -_id';
-    const profileFields = isOwnProfile ? '' : '-__v -isComplete -updatedAt';
+    // Privacy Logic: Hide certain fields if account is private and not following
+    const userFields = isOwnProfile ? 'username email isPrivate followersCount followingCount' : 'username isPrivate followersCount followingCount -_id';
+    
+    // If private, hide bio and other profile details
+    const profileFields = isPrivate ? '-__v -isComplete -updatedAt -bio -socialLinks' : '-__v -isComplete -updatedAt';
 
     const profile = await this.usersRepository.findProfileByUserId(
       user._id.toString(), 
@@ -88,7 +101,12 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
-    return profile;
+
+    return {
+      ...profile.toObject(),
+      isFollowing,
+      canViewFullProfile: !isPrivate,
+    };
   }
 
   async softDelete(id: string): Promise<any> {
@@ -112,6 +130,26 @@ export class UsersService {
     return this.usersRepository.update(id, { isActive: true, deactivatedAt: null });
   }
 
+  async updatePrivacy(userId: string, isPrivate: boolean): Promise<any> {
+    const user = await this.usersRepository.update(userId, { isPrivate });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // If switching to Public, auto-accept all pending requests
+    if (!isPrivate) {
+      const pendingRequests = await this.followsService.getPendingRequests(userId, 1000);
+      for (const request of pendingRequests.data) {
+        await this.followsService.acceptRequest(userId, request.userId.toString());
+      }
+    }
+
+    return { 
+      message: `Account is now ${isPrivate ? 'Private' : 'Public'}`,
+      isPrivate 
+    };
+  }
+
   async updateAvatar(userId: string, avatarUrl: string): Promise<ProfileDocument> {
     return this.updateProfile(userId, { avatarUrl });
   }
@@ -122,7 +160,7 @@ export class UsersService {
       throw new BadRequestException('User does not have an avatar');
     }
 
-    // Note: In the next phase, we will add Cloud Storage (S3/Cloudinary) file deletion here
+    // Note: we will add Cloud Storage (S3/Cloudinary) file deletion here
     return this.updateProfile(userId, { avatarUrl: null });
   }
 

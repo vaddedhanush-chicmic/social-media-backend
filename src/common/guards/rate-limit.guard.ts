@@ -10,7 +10,7 @@ export class RateLimitGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const limit = this.configService.get<number>('RATE_LIMIT_MAX') || 10;
+    const limit = this.configService.get<number>('RATE_LIMIT_MAX') || 20;
     const ttl = (this.configService.get<number>('RATE_LIMIT_TTL') || 60000) / 1000; // convert ms to seconds
     
     const request = context.switchToHttp().getRequest();

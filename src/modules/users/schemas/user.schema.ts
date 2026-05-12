@@ -26,6 +26,15 @@ export class User {
   @Prop()
   resetPasswordExpires?: Date;
 
+  @Prop({ default: 0 })
+  followersCount: number;
+
+  @Prop({ default: 0 })
+  followingCount: number;
+
+  @Prop({ default: false })
+  isPrivate: boolean;
+
   @Prop({ default: true })
   isActive: boolean;
 
