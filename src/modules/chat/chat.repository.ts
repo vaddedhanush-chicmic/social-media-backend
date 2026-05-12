@@ -27,6 +27,12 @@ export class ChatRepository {
     }).exec();
   }
 
+  async findConversationById(
+    conversationId: string,
+  ): Promise<ConversationDocument | null> {
+    return this.conversationModel.findById(conversationId).exec();
+  }
+
   async createConversation(
     initiatorId: string,
     receiverId: string,
@@ -53,8 +59,12 @@ export class ChatRepository {
     ).exec();
   }
 
+  // Hard delete — only used for decline request
   async deleteConversation(conversationId: string): Promise<void> {
     await this.conversationModel.findByIdAndDelete(conversationId).exec();
+    await this.messageModel.deleteMany({
+      conversationId: new Types.ObjectId(conversationId),
+    }).exec();
   }
 
   async updateLastMessage(
@@ -67,13 +77,58 @@ export class ChatRepository {
     }).exec();
   }
 
+  // Instagram: set deletedAt timestamp for this user
+  async deleteConversationForUser(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.conversationModel.findByIdAndUpdate(conversationId, {
+      $set: { [`deletedAt.${userId}`]: new Date() },
+    }).exec();
+  }
+
+  // Instagram: archive for this user
+  async archiveConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationDocument | null> {
+    return this.conversationModel.findByIdAndUpdate(
+      conversationId,
+      { $addToSet: { archivedFor: new Types.ObjectId(userId) } },
+      { returnDocument: 'after' },
+    ).exec();
+  }
+
+  // Instagram: unarchive for this user
+  async unarchiveConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationDocument | null> {
+    return this.conversationModel.findByIdAndUpdate(
+      conversationId,
+      { $pull: { archivedFor: new Types.ObjectId(userId) } },
+      { returnDocument: 'after' },
+    ).exec();
+  }
+
   async getUserConversations(
     userId: string,
+    includeArchived = false,
   ): Promise<ConversationDocument[]> {
+    const query: any = {
+      participants: new Types.ObjectId(userId),
+      // exclude conversations this user has deleted
+      [`deletedAt.${userId}`]: { $exists: false },
+    };
+
+    if (!includeArchived) {
+      query.archivedFor = { $ne: new Types.ObjectId(userId) };
+    } else {
+      query.archivedFor = new Types.ObjectId(userId);
+    }
+
     return this.conversationModel
-      .find({
-        participants: new Types.ObjectId(userId),
-      })
+      .find(query)
       .populate('lastMessage')
       .populate('participants', 'username')
       .sort({ lastActivity: -1 })
@@ -101,14 +156,21 @@ export class ChatRepository {
     conversationId: string,
     limit: number,
     cursor?: string,
+    after?: Date,  // cutoff for users who deleted the chat
   ): Promise<MessageDocument[]> {
     const query: any = {
       conversationId: new Types.ObjectId(conversationId),
       deletedAt: null,
+      recalled: false,
     };
 
     if (cursor) {
       query._id = { $lt: new Types.ObjectId(cursor) };
+    }
+
+    // Only show messages sent after the user deleted the chat
+    if (after) {
+      query.createdAt = { $gt: after };
     }
 
     return this.messageModel
@@ -129,6 +191,25 @@ export class ChatRepository {
         isRead: false,
       },
       { isRead: true },
+    ).exec();
+  }
+
+  // Instagram: unsend — recalled for both sides
+  async recallMessage(
+    messageId: string,
+    userId: string,
+  ): Promise<MessageDocument | null> {
+    return this.messageModel.findOneAndUpdate(
+      {
+        _id: new Types.ObjectId(messageId),
+        senderId: new Types.ObjectId(userId),
+        recalled: false,
+      },
+      {
+        recalled: true,
+        recalledAt: new Date(),
+      },
+      { returnDocument: 'after' },
     ).exec();
   }
 
@@ -155,6 +236,7 @@ export class ChatRepository {
       conversationId: new Types.ObjectId(conversationId),
       receiverId: new Types.ObjectId(userId),
       isRead: false,
+      recalled: false,
     }).exec();
   }
 }

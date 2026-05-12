@@ -16,6 +16,31 @@ export class ChatService {
     private readonly followsRepository: FollowsRepository,
   ) {}
 
+  // ── Helpers ───────────────────────────────────────────────────
+
+  private async verifyParticipant(
+    conversationId: string,
+    userId: string,
+  ) {
+    const conversation = await this.chatRepository.findConversationById(
+      conversationId,
+    );
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId,
+    );
+
+    if (!isParticipant) {
+      throw new ForbiddenException('You are not part of this conversation');
+    }
+
+    return conversation;
+  }
+
   // ── Core Permission Check ─────────────────────────────────────
 
   async canChat(
@@ -32,12 +57,10 @@ export class ChatService {
       throw new ForbiddenException('This account is not available');
     }
 
-    // Public account — anyone can chat
     if (!receiver.isPrivate) {
       return { allowed: true, requiresRequest: false };
     }
 
-    // Private account — check if sender actively follows receiver
     const relation = await this.followsRepository.findRelation(
       senderId,
       receiverId,
@@ -47,7 +70,6 @@ export class ChatService {
       return { allowed: true, requiresRequest: false };
     }
 
-    // Private account — sender does not follow, needs a message request
     return { allowed: true, requiresRequest: true };
   }
 
@@ -69,15 +91,13 @@ export class ChatService {
       receiverId,
     );
 
-    // First time messaging — create conversation
     if (!conversation) {
       conversation = await this.chatRepository.createConversation(
         senderId,
         receiverId,
-        !requiresRequest, // isAccepted = true for public, false for private
+        !requiresRequest,
       );
     } else {
-      // Conversation exists but not accepted — only initiator's first message allowed
       if (!conversation.isAccepted) {
         if (conversation.initiator.toString() !== senderId) {
           throw new ForbiddenException(
@@ -134,7 +154,6 @@ export class ChatService {
       return { data: [], nextCursor: null, hasMore: false };
     }
 
-    // Only participants can read the conversation
     const isParticipant = conversation.participants.some(
       (p) => p.toString() === requestingUserId,
     );
@@ -143,10 +162,14 @@ export class ChatService {
       throw new ForbiddenException('You are not part of this conversation');
     }
 
+    // Instagram: only show messages after the user's deletion timestamp
+    const userDeletedAt = conversation.deletedAt?.get(requestingUserId);
+
     const messages = await this.chatRepository.getMessages(
       conversation._id.toString(),
       limit + 1,
       cursor,
+      userDeletedAt,
     );
 
     const hasMore = messages.length > limit;
@@ -170,7 +193,6 @@ export class ChatService {
       throw new NotFoundException('Conversation not found');
     }
 
-    // Only the receiver (non-initiator) can accept
     if (conversation.initiator.toString() === userId) {
       throw new ForbiddenException('You cannot accept your own request');
     }
@@ -187,8 +209,7 @@ export class ChatService {
   }
 
   async declineRequest(userId: string, conversationId: string) {
-    const conversation = await this.chatRepository.findConversation(
-      userId,
+    const conversation = await this.chatRepository.findConversationById(
       conversationId,
     );
 
@@ -200,6 +221,15 @@ export class ChatService {
       throw new ForbiddenException('You cannot decline your own request');
     }
 
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId,
+    );
+
+    if (!isParticipant) {
+      throw new ForbiddenException('You are not part of this conversation');
+    }
+
+    // Hard delete — declined requests are gone for both sides
     await this.chatRepository.deleteConversation(conversationId);
 
     return { message: 'Message request declined' };
@@ -209,18 +239,75 @@ export class ChatService {
 
   async getConversations(userId: string) {
     const conversations =
-      await this.chatRepository.getUserConversations(userId);
+      await this.chatRepository.getUserConversations(userId, false);
     return { data: conversations };
+  }
+
+  async getArchivedConversations(userId: string) {
+    const conversations =
+      await this.chatRepository.getUserConversations(userId, true);
+    return { data: conversations };
+  }
+
+  // ── Delete Conversation (Instagram: for me only) ──────────────
+
+  async deleteConversationForMe(userId: string, conversationId: string) {
+    await this.verifyParticipant(conversationId, userId);
+
+    await this.chatRepository.deleteConversationForUser(
+      conversationId,
+      userId,
+    );
+
+    return { message: 'Conversation deleted' };
+  }
+
+  // ── Archive / Unarchive ───────────────────────────────────────
+
+  async archiveConversation(userId: string, conversationId: string) {
+    await this.verifyParticipant(conversationId, userId);
+
+    await this.chatRepository.archiveConversation(conversationId, userId);
+
+    return { message: 'Conversation archived' };
+  }
+
+  async unarchiveConversation(userId: string, conversationId: string) {
+    await this.verifyParticipant(conversationId, userId);
+
+    await this.chatRepository.unarchiveConversation(conversationId, userId);
+
+    return { message: 'Conversation unarchived' };
   }
 
   // ── Mark As Read ──────────────────────────────────────────────
 
   async markAsRead(userId: string, conversationId: string) {
+    await this.verifyParticipant(conversationId, userId);
+
     await this.chatRepository.markAsRead(conversationId, userId);
+
     return { message: 'Messages marked as read' };
   }
 
-  // ── Delete Message ────────────────────────────────────────────
+  // ── Delete Message (Instagram: unsend for both sides) ─────────
+
+  async recallMessage(userId: string, messageId: string) {
+    const message = await this.chatRepository.recallMessage(
+      messageId,
+      userId,
+    );
+
+    if (!message) {
+      throw new NotFoundException(
+        'Message not found or you are not the sender',
+      );
+    }
+
+    return { message: 'Message unsent', data: message };
+  }
+
+  // ── Soft delete kept for admin use ────────────────────────────
 
   async deleteMessage(userId: string, messageId: string) {
     const message = await this.chatRepository.softDeleteMessage(

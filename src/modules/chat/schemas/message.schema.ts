@@ -42,6 +42,18 @@ export class Message {
     default: null,
   })
   deletedAt: Date;
+
+  @Prop({
+    type: Boolean,
+    default: false,
+  })
+  recalled: boolean;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  recalledAt: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

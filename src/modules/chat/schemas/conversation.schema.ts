@@ -37,6 +37,23 @@ export class Conversation {
     required: true,
   })
   initiator: Types.ObjectId;
+
+  // ── Instagram-style additions ─────────────────────────────────
+
+  // Stores { userId: deletedAt } — hides chat + filters old messages
+  @Prop({
+    type: Map,
+    of: Date,
+    default: {},
+  })
+  deletedAt: Map<string, Date>;
+
+  @Prop({
+    type: [Types.ObjectId],
+    ref: 'User',
+    default: [],
+  })
+  archivedFor: Types.ObjectId[];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

@@ -22,8 +22,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  // In-memory map of userId → socketId
-  // We'll replace this with Redis in a later step
   private connectedUsers = new Map<string, string>();
 
   constructor(private readonly chatService: ChatService) {}
@@ -56,9 +54,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  // ── Helper: emit to a specific user ──────────────────────────
+  // ── Helper ────────────────────────────────────────────────────
 
-  private emitToUser(userId: string, event: string, data: any) {
+  public emitToUser(userId: string, event: string, data: any) {
     const socketId = this.connectedUsers.get(userId);
     if (socketId) {
       this.server.to(socketId).emit(event, data);
@@ -73,33 +71,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: SendMessageDto,
   ) {
-    console.log('GATEWAY HIT — senderId:', client.data.userId, 'dto:', dto);
     try {
       const senderId = client.data.userId;
-
       const result = await this.chatService.sendMessage(
         senderId,
         dto.toUserId,
         dto.content,
       );
 
-      // Private account — emit as message request
       if (result.isRequest) {
         this.emitToUser(dto.toUserId, 'message_request', {
           conversation: result.conversation,
           message: result.message,
         });
-
-        // Confirm to sender that request was sent
         client.emit('request_sent', {
           conversation: result.conversation,
           message: result.message,
         });
-
         return;
       }
 
-      // Public account or active follower — deliver instantly
       this.emitToUser(dto.toUserId, 'new_message', result.message);
       client.emit('new_message', result.message);
     } catch (error) {
@@ -138,10 +129,52 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const userId = client.data.userId;
       await this.chatService.markAsRead(userId, body.conversationId);
+      client.emit('messages_read', { conversationId: body.conversationId });
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    }
+  }
 
-      // Notify the other participant their messages were read
-      const conversation = body.conversationId;
-      client.emit('messages_read', { conversationId: conversation });
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('recall_message')
+  async handleRecallMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { messageId: string },
+  ) {
+    try {
+      const userId = client.data.userId;
+      const result = await this.chatService.recallMessage(userId, body.messageId);
+
+      const receiverId = result.data.receiverId.toString();
+
+      // Notify both sides — message disappears for everyone
+      this.emitToUser(receiverId, 'message_recalled', {
+        messageId: body.messageId,
+        conversationId: result.data.conversationId,
+      });
+      client.emit('message_recalled', {
+        messageId: body.messageId,
+        conversationId: result.data.conversationId,
+      });
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('delete_conversation')
+  async handleDeleteConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    try {
+      const userId = client.data.userId;
+      await this.chatService.deleteConversationForMe(userId, body.conversationId);
+
+      // Only emit back to the sender — other participant is unaffected
+      client.emit('conversation_deleted', {
+        conversationId: body.conversationId,
+      });
     } catch (error) {
       client.emit('error', { message: error.message });
     }
@@ -160,12 +193,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         dto.conversationId,
       );
 
-      // Notify the initiator their request was accepted
       const initiatorId = result.conversation.initiator.toString();
       this.emitToUser(initiatorId, 'request_accepted', {
         conversationId: dto.conversationId,
       });
-
       client.emit('request_accepted', {
         conversationId: dto.conversationId,
       });
