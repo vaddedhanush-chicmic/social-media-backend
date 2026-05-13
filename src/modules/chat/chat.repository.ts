@@ -137,13 +137,17 @@ export class ChatRepository {
     senderId: string,
     receiverId: string,
     conversationId: string,
-    content: string,
+    content?: string,
+    attachments: { url: string; mimeType: string; size: number; originalName: string }[] = [],
+    gifUrl?: string,
   ): Promise<MessageDocument> {
     const message = new this.messageModel({
-      senderId: new Types.ObjectId(senderId),
-      receiverId: new Types.ObjectId(receiverId),
+      senderId:       new Types.ObjectId(senderId),
+      receiverId:     new Types.ObjectId(receiverId),
       conversationId: new Types.ObjectId(conversationId),
-      content,
+      content:        content ?? null,
+      attachments,
+      gifUrl:         gifUrl ?? null,
     });
     return message.save();
   }

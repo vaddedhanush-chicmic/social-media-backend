@@ -7,19 +7,30 @@ import {
   Param,
   Body,
   Query,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ChatHistoryQueryDto } from './dto/chat-history-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
+import { UploadService } from '../upload/upload.service';
+import { UploadContext } from '../upload/upload.constants';
+import { multerConfig } from '../upload/multer.config';
+import { GiphyService } from './giphy.service';
+import { GifSearchQueryDto } from './dto/gif-search-query.dto';
 
 @ApiTags('Chat')
 @ApiBearerAuth()
@@ -28,20 +39,57 @@ export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
+    private readonly uploadService: UploadService,
+    private readonly giphyService: GiphyService,
   ) {}
 
   // ── Send Message ──────────────────────────────────────────────
 
   @Post()
-  @ApiOperation({ summary: 'Send a message' })
+  @UseInterceptors(FilesInterceptor('attachments', 5, multerConfig()))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Send a message (text, image, video, gif or mix)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        toUserId:    { type: 'string' },
+        content:     { type: 'string' },
+        gifUrl:      { type: 'string' },
+        attachments: { type: 'array', items: { type: 'string', format: 'binary' } },
+      },
+    },
+  })
   async sendMessage(
     @CurrentUser() user: any,
     @Body() dto: SendMessageDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
+    // Must have at least one of: text, gif, file
+    if (!dto.content && !dto.gifUrl && (!files || files.length === 0)) {
+      throw new BadRequestException(
+        'Message must have text, a GIF, or an attachment',
+      );
+    }
+
+    // Upload all files and collect attachment objects
+    const attachments = await Promise.all(
+      (files ?? []).map(async (file) => {
+        const { url, mimeType, size } = await this.uploadService.saveFile(
+          file,
+          UploadContext.CHAT,
+          user.userId,
+        );
+        return { url, mimeType, size, originalName: file.originalname };
+      }),
+    );
+
     const result = await this.chatService.sendMessage(
       user.userId,
       dto.toUserId,
       dto.content,
+      attachments,
+      dto.gifUrl,
     );
 
     // Push via socket even when sent via REST
@@ -146,7 +194,6 @@ export class ChatController {
       messageId,
     );
 
-    // Notify the other participant via socket
     const receiverId = result.data.receiverId.toString();
     this.chatGateway.emitToUser(receiverId, 'message_recalled', {
       messageId,
@@ -154,5 +201,18 @@ export class ChatController {
     });
 
     return result;
+  }
+  // ── GIF ───────────────────────────────────────────────────────
+
+  @Get('gifs/trending')
+  @ApiOperation({ summary: 'Get trending GIFs from Giphy' })
+  async trendingGifs() {
+    return this.giphyService.trending();
+  }
+
+  @Get('gifs/search')
+  @ApiOperation({ summary: 'Search GIFs on Giphy' })
+  async searchGifs(@Query() query: GifSearchQueryDto) {
+    return this.giphyService.search(query.q, query.limit);
   }
 }

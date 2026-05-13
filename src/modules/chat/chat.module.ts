@@ -11,6 +11,8 @@ import { Message, MessageSchema } from './schemas/message.schema';
 import { Conversation, ConversationSchema } from './schemas/conversation.schema';
 import { UsersModule } from '../users/users.module';
 import { FollowsModule } from '../follows/follows.module';
+import { UploadModule } from '../upload/upload.module';
+import { GiphyService } from './giphy.service';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { FollowsModule } from '../follows/follows.module';
     }),
     UsersModule,
     FollowsModule,
+    UploadModule,
   ],
   controllers: [ChatController],
   providers: [
@@ -34,6 +37,7 @@ import { FollowsModule } from '../follows/follows.module';
     ChatService,
     ChatRepository,
     WsJwtGuard,
+    GiphyService,
   ],
 })
 export class ChatModule {}

@@ -94,6 +94,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         senderId,
         dto.toUserId,
         dto.content,
+        [],
+        dto.gifUrl, 
       );
 
       if (result.isRequest) {
