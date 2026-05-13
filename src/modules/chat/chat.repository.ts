@@ -97,7 +97,6 @@ export class ChatRepository {
     ).exec();
   }
 
-  // Instagram: unarchive for this user
   async unarchiveConversation(
     conversationId: string,
     userId: string,

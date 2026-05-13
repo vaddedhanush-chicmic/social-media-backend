@@ -173,7 +173,7 @@ export class ChatService {
       hasMore,
     };
   }
-  
+
   async deleteMessageForMe(userId: string, messageId: string) {
   const message = await this.chatRepository.deleteMessageForUser(
     messageId,
@@ -277,7 +277,6 @@ export class ChatService {
     return { data: conversations };
   }
 
-  // ── Delete Conversation (Instagram: for me only) ──────────────
 
   async deleteConversationForMe(userId: string, conversationId: string) {
     await this.verifyParticipant(conversationId, userId);
@@ -307,7 +306,6 @@ export class ChatService {
     return { message: 'Messages marked as read' };
   }
 
-  // ── Recall Message (Instagram: unsend for both) ───────────────
 
   async recallMessage(userId: string, messageId: string) {
     const message = await this.chatRepository.recallMessage(messageId, userId);
