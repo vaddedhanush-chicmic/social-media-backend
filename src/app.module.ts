@@ -13,6 +13,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { FollowsModule } from './modules/follows/follows.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { PostsModule } from './modules/posts/posts.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import mongoConfig from './config/mongo.config';
@@ -45,6 +46,7 @@ import giphyConfig from './config/giphy.config';
     FollowsModule,
     ChatModule,
     UploadModule,
+    PostsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
