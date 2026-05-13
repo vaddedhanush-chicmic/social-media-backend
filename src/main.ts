@@ -3,10 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './adapters/redis-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Redis Socket.io adapter
+  const redisIoAdapter = new RedisIoAdapter(app, configService);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // Global Prefix
   app.setGlobalPrefix(configService.get<string>('app.apiPrefix') || 'api/v1');
@@ -25,7 +31,11 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // CORS
-  app.enableCors();
+  app.enableCors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    credentials: true,
+  });
 
   await app.listen(configService.get<number>('app.port') || 3000);
   console.log(`Application is running on: ${await app.getUrl()}`);

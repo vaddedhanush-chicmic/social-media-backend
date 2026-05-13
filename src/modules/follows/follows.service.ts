@@ -106,7 +106,7 @@ export class FollowsService {
     cursor?: string,
   ) {
     // Privacy Check
-    if (userId !== requestingUserId) {
+    if (userId.toString() !== requestingUserId.toString()) {
       const user = await this.usersRepository.findById(userId);
       if (user?.isPrivate) {
         const relation = await this.followsRepository.findRelation(requestingUserId, userId);
@@ -140,7 +140,7 @@ export class FollowsService {
     cursor?: string,
   ) {
     // Privacy Check
-    if (userId !== requestingUserId) {
+    if (userId.toString() !== requestingUserId.toString()) {
       const user = await this.usersRepository.findById(userId);
       if (user?.isPrivate) {
         const relation = await this.followsRepository.findRelation(requestingUserId, userId);
