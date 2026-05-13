@@ -38,8 +38,6 @@ export class Conversation {
   })
   initiator: Types.ObjectId;
 
-  // ── Instagram-style additions ─────────────────────────────────
-
   // Stores { userId: deletedAt } — hides chat + filters old messages
   @Prop({
     type: Map,

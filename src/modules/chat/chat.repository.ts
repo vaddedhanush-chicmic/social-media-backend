@@ -77,7 +77,6 @@ export class ChatRepository {
     }).exec();
   }
 
-  // Instagram: set deletedAt timestamp for this user
   async deleteConversationForUser(
     conversationId: string,
     userId: string,
@@ -87,7 +86,6 @@ export class ChatRepository {
     }).exec();
   }
 
-  // Instagram: archive for this user
   async archiveConversation(
     conversationId: string,
     userId: string,
@@ -117,7 +115,6 @@ export class ChatRepository {
   ): Promise<ConversationDocument[]> {
     const query: any = {
       participants: new Types.ObjectId(userId),
-      // exclude conversations this user has deleted
       [`deletedAt.${userId}`]: { $exists: false },
     };
 
@@ -156,7 +153,8 @@ export class ChatRepository {
     conversationId: string,
     limit: number,
     cursor?: string,
-    after?: Date,  // cutoff for users who deleted the chat
+    after?: Date,
+    userId?: string,
   ): Promise<MessageDocument[]> {
     const query: any = {
       conversationId: new Types.ObjectId(conversationId),
@@ -171,6 +169,11 @@ export class ChatRepository {
     // Only show messages sent after the user deleted the chat
     if (after) {
       query.createdAt = { $gt: after };
+    }
+
+    // Exclude messages deleted for this user
+    if (userId) {
+      query.deletedFor = { $ne: new Types.ObjectId(userId) };
     }
 
     return this.messageModel
@@ -194,7 +197,6 @@ export class ChatRepository {
     ).exec();
   }
 
-  // Instagram: unsend — recalled for both sides
   async recallMessage(
     messageId: string,
     userId: string,
@@ -209,6 +211,22 @@ export class ChatRepository {
         recalled: true,
         recalledAt: new Date(),
       },
+      { returnDocument: 'after' },
+    ).exec();
+  }
+
+  async deleteMessageForUser(
+    messageId: string,
+    userId: string,
+  ): Promise<MessageDocument | null> {
+    return this.messageModel.findOneAndUpdate(
+      {
+        _id: new Types.ObjectId(messageId),
+        deletedFor: { $ne: new Types.ObjectId(userId) },
+        recalled: false,
+        deletedAt: null,
+      },
+      { $addToSet: { deletedFor: new Types.ObjectId(userId) } },
       { returnDocument: 'after' },
     ).exec();
   }

@@ -43,6 +43,15 @@ export class Message {
   })
   deletedAt: Date;
 
+
+  // Delete for me only — hidden per user
+  @Prop({
+    type: [Types.ObjectId],
+    ref: 'User',
+    default: [],
+  })
+  deletedFor: Types.ObjectId[];
+
   @Prop({
     type: Boolean,
     default: false,

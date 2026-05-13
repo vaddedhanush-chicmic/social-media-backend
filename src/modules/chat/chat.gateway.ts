@@ -9,6 +9,8 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -24,14 +26,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private connectedUsers = new Map<string, string>();
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // ── Connection ────────────────────────────────────────────────
 
   async handleConnection(client: Socket) {
     try {
-      const userId = client.handshake.query.userId as string;
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.replace('Bearer ', '');
 
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+
+      const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
+      const payload = this.jwtService.verify(token, { secret });
+
+      const userId = payload.sub;
       if (!userId) {
         client.disconnect();
         return;
@@ -39,9 +56,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.connectedUsers.set(userId, client.id);
       client.data.userId = userId;
-
       console.log(`User ${userId} connected — socket ${client.id}`);
-    } catch {
+    } catch (err) {
+      console.log('WS auth failed:', err.message);
       client.disconnect();
     }
   }
@@ -143,11 +160,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     try {
       const userId = client.data.userId;
-      const result = await this.chatService.recallMessage(userId, body.messageId);
+      const result = await this.chatService.recallMessage(
+        userId,
+        body.messageId,
+      );
 
       const receiverId = result.data.receiverId.toString();
-
-      // Notify both sides — message disappears for everyone
       this.emitToUser(receiverId, 'message_recalled', {
         messageId: body.messageId,
         conversationId: result.data.conversationId,
@@ -162,6 +180,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @UseGuards(WsJwtGuard)
+  @SubscribeMessage('delete_message_for_me')
+  async handleDeleteMessageForMe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { messageId: string },
+  ) {
+    try {
+      const userId = client.data.userId;
+      await this.chatService.deleteMessageForMe(userId, body.messageId);
+
+      // only emit back to sender — other person unaffected
+      client.emit('message_deleted_for_me', {
+        messageId: body.messageId,
+      });
+    } catch (error) {
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('delete_conversation')
   async handleDeleteConversation(
     @ConnectedSocket() client: Socket,
@@ -169,9 +206,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     try {
       const userId = client.data.userId;
-      await this.chatService.deleteConversationForMe(userId, body.conversationId);
-
-      // Only emit back to the sender — other participant is unaffected
+      await this.chatService.deleteConversationForMe(
+        userId,
+        body.conversationId,
+      );
       client.emit('conversation_deleted', {
         conversationId: body.conversationId,
       });
@@ -193,7 +231,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         dto.conversationId,
       );
 
-      const initiatorId = result.conversation.initiator.toString();
+      const initiatorId = result.conversation!.initiator.toString();
       this.emitToUser(initiatorId, 'request_accepted', {
         conversationId: dto.conversationId,
       });
@@ -214,7 +252,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const userId = client.data.userId;
       await this.chatService.declineRequest(userId, dto.conversationId);
-
       client.emit('request_declined', {
         conversationId: dto.conversationId,
       });

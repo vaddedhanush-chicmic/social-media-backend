@@ -124,6 +124,16 @@ export class ChatController {
 
   // ── Message ───────────────────────────────────────────────────
 
+  @Delete('message/:messageId/me')
+  @ApiOperation({ summary: 'Delete a message for me only' })
+  @ApiParam({ name: 'messageId', description: 'Message ID' })
+  async deleteMessageForMe(
+    @CurrentUser() user: any,
+    @Param('messageId', ParseObjectIdPipe) messageId: string,
+  ) {
+    return this.chatService.deleteMessageForMe(user.userId, messageId);
+  }
+
   @Delete('message/:messageId')
   @ApiOperation({ summary: 'Unsend a message (removes for both sides)' })
   @ApiParam({ name: 'messageId', description: 'Message ID to unsend' })
