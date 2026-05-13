@@ -7,6 +7,7 @@ import {
 import { ChatRepository } from './chat.repository';
 import { UsersRepository } from '../users/users.repository';
 import { FollowsRepository } from '../follows/follows.repository';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ChatService {
@@ -14,6 +15,7 @@ export class ChatService {
     private readonly chatRepository: ChatRepository,
     private readonly usersRepository: UsersRepository,
     private readonly followsRepository: FollowsRepository,
+    private readonly uploadService: UploadService,
   ) {}
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -71,7 +73,13 @@ export class ChatService {
 
   // ── Send Message ──────────────────────────────────────────────
 
-  async sendMessage(senderId: string, receiverId: string, content: string) {
+  async sendMessage(
+    senderId: string,
+    receiverId: string,
+    content?: string,
+    attachments: { url: string; mimeType: string; size: number; originalName: string }[] = [],
+    gifUrl?: string,
+  ) {
     if (senderId === receiverId) {
       throw new BadRequestException('Cannot send message to yourself');
     }
@@ -115,6 +123,8 @@ export class ChatService {
       receiverId,
       conversation._id.toString(),
       content,
+      attachments,
+      gifUrl,
     );
 
     await this.chatRepository.updateLastMessage(
@@ -175,19 +185,36 @@ export class ChatService {
   }
 
   async deleteMessageForMe(userId: string, messageId: string) {
-  const message = await this.chatRepository.deleteMessageForUser(
-    messageId,
-    userId,
-  );
-
-  if (!message) {
-    throw new NotFoundException(
-      'Message not found or already deleted',
+    const message = await this.chatRepository.deleteMessageForUser(
+      messageId,
+      userId,
     );
-  }
 
-  return { message: 'Message deleted for you' };
-}
+    if (!message) {
+      throw new NotFoundException('Message not found or already deleted');
+    }
+
+    // Check if both participants have now deleted this message
+    const conversation = await this.chatRepository.findConversationById(
+      message.conversationId.toString(),
+    );
+
+    if (conversation) {
+      const bothDeleted = conversation.participants.every((participantId) =>
+        message.deletedFor.some(
+          (id) => id.toString() === participantId.toString(),
+        ),
+      );
+
+      if (bothDeleted && message.attachments?.length > 0) {
+        message.attachments.forEach((attachment) => {
+          this.uploadService.deleteFileByUrl(attachment.url);
+        });
+      }
+    }
+
+    return { message: 'Message deleted for you' };
+  }
 
   // ── Accept Request ────────────────────────────────────────────
 
@@ -314,6 +341,13 @@ export class ChatService {
       throw new NotFoundException(
         'Message not found or you are not the sender',
       );
+    }
+
+    // Permanent delete — gone for everyone so clean up files
+    if (message.attachments?.length > 0) {
+      message.attachments.forEach((attachment) => {
+        this.uploadService.deleteFileByUrl(attachment.url);
+      });
     }
 
     return { message: 'Message unsent', data: message };

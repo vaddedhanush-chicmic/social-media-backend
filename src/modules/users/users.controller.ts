@@ -1,22 +1,48 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, Req, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Query,
+  Param,
+  UseGuards,
+  Req,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as express from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePrivacyDto } from './dto/update-privacy.dto';
 import { SearchUserDto } from './dto/search-user.dto';
+import { UploadService } from '../upload/upload.service';
+import { UploadContext } from '../upload/upload.constants';
+import { multerConfig } from '../upload/multer.config';
 
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private uploadService: UploadService,
+  ) {}
 
   @Post('profile')
   @ApiOperation({ summary: 'Create user profile' })
@@ -52,22 +78,30 @@ export class UsersController {
     return this.usersService.updatePrivacy(userId, updatePrivacyDto.isPrivate);
   }
 
+  // ─── File Upload ──────────────────────────────────────────────────────────
+
+  /**
+   * POST /users/me/fileupload?type=avatar
+   *
+   * Saves file to disk (uploads/avatars/<uuid>.ext) and stores the public URL
+   * in the profile document. Old avatar file is deleted from disk automatically.
+   */
   @Post('me/fileupload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', multerConfig()))
   @ApiConsumes('multipart/form-data')
-  @ApiQuery({ name: 'type', enum: ['avatar'], required: true, description: 'The type of file being uploaded' })
+  @ApiQuery({
+    name: 'type',
+    enum: ['avatar'],
+    required: true,
+    description: 'The type of file being uploaded',
+  })
   @ApiBody({
     schema: {
       type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
+      properties: { file: { type: 'string', format: 'binary' } },
     },
   })
-  @ApiOperation({ summary: 'Universal file upload' })
+  @ApiOperation({ summary: 'Upload a user file (avatar, etc.)' })
   async uploadFile(
     @CurrentUser('userId') userId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -77,35 +111,58 @@ export class UsersController {
       throw new BadRequestException('No file uploaded');
     }
 
-    // Note: we will add Cloud Storage (S3/Cloudinary) here
-    const mockUrl = `https://storage.com/uploads/${Date.now()}-${file.originalname}`;
-
     if (type === 'avatar') {
-      await this.usersService.updateAvatar(userId, mockUrl);
-      return { 
-        message: 'Avatar updated successfully', 
-        url: mockUrl,
-        type 
-      };
+      const profile = await this.usersService.getProfile(userId);
+      const oldUrl: string | undefined = (profile as any).avatarUrl;
+
+      const { url, size, mimeType } = await this.uploadService.saveFile(
+        file,
+        UploadContext.AVATAR,
+        userId,
+      );
+
+      await this.usersService.updateAvatar(userId, url);
+
+      if (oldUrl) {
+        this.uploadService.deleteFileByUrl(oldUrl);
+      }
+
+      return { message: 'Avatar updated successfully', url, mimeType, size, type };
     }
 
-    return { 
-      message: 'File uploaded successfully (Generic)', 
-      type, 
-      fileName: file.originalname 
-    };
+    throw new BadRequestException(`Unsupported upload type: "${type}"`);
   }
 
+  /**
+   * DELETE /users/me/fileupload?type=avatar
+   *
+   * Removes the file from disk and clears the URL from the profile document.
+   */
   @Delete('me/fileupload')
-  @ApiQuery({ name: 'type', enum: ['avatar'], required: true, description: 'The type of file to remove' })
+  @ApiQuery({
+    name: 'type',
+    enum: ['avatar'],
+    required: true,
+    description: 'The type of file to remove',
+  })
   @ApiOperation({ summary: 'Remove uploaded file (e.g. avatar)' })
   async removeFile(
     @CurrentUser('userId') userId: string,
     @Query('type') type: string,
   ) {
     if (type === 'avatar') {
-      return this.usersService.removeAvatar(userId);
+      const profile = await this.usersService.getProfile(userId);
+      const oldUrl: string | undefined = (profile as any).avatarUrl;
+
+      const result = await this.usersService.removeAvatar(userId);
+
+      if (oldUrl) {
+        this.uploadService.deleteFileByUrl(oldUrl);
+      }
+
+      return result;
     }
+
     throw new BadRequestException('Invalid file type for removal');
   }
 

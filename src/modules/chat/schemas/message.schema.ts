@@ -3,6 +3,23 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type MessageDocument = HydratedDocument<Message>;
 
+@Schema({ _id: false })
+export class Attachment {
+  @Prop({ required: true })
+  url: string;
+
+  @Prop({ required: true })
+  mimeType: string;
+
+  @Prop({ required: true })
+  size: number;
+
+  @Prop({ required: true })
+  originalName: string;
+}
+
+export const AttachmentSchema = SchemaFactory.createForClass(Attachment);
+
 @Schema({ timestamps: true })
 export class Message {
   @Prop({
@@ -26,11 +43,27 @@ export class Message {
   })
   conversationId: Types.ObjectId;
 
+  // Optional — image-only messages have no text
   @Prop({
-    required: true,
+    type: String,
     trim: true,
+    default: null,
   })
-  content: string;
+  content: string | null;
+
+  // Optional — text-only messages have no attachments
+  @Prop({
+    type: [AttachmentSchema],
+    default: [],
+  })
+  attachments: Attachment[];
+
+  // Optional — gif URL from Giphy
+  @Prop({
+    type: String,
+    default: null,
+  })
+  gifUrl: string | null;
 
   @Prop({
     default: false,
@@ -43,8 +76,6 @@ export class Message {
   })
   deletedAt: Date;
 
-
-  // Delete for me only — hidden per user
   @Prop({
     type: [Types.ObjectId],
     ref: 'User',

@@ -10,6 +10,7 @@ import { RedisModule } from '../../database/redis.module';
 import { JwtModule } from '@nestjs/jwt';
 
 import { FollowsModule } from '../follows/follows.module';
+import { UploadModule } from '../upload/upload.module';
 import { forwardRef } from '@nestjs/common';
 
 @Module({
@@ -18,6 +19,7 @@ import { forwardRef } from '@nestjs/common';
       { name: User.name, schema: UserSchema },
       { name: Profile.name, schema: ProfileSchema },
     ]),
+    UploadModule,
     RedisModule,
     JwtModule,
     forwardRef(() => FollowsModule),
