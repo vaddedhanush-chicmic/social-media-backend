@@ -139,6 +139,14 @@ export class PostsService {
     return updated;
   }
 
+  async unarchivePost(postId: string, requesterId: string): Promise<PostDocument> {
+    const post = await this.findOrThrow(postId);
+    this.assertOwner(post, requesterId);
+    const updated = await this.postsRepository.update(postId, { isArchived: false });
+    if (!updated) throw new NotFoundException('Post not found.');
+    return updated;
+  }
+
   // ── Delete ────────────────────────────────────────────────────────────────
 
   async deletePost(postId: string, requesterId: string): Promise<void> {

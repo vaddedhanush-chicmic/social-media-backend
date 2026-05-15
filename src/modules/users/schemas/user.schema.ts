@@ -31,6 +31,9 @@ export class User {
 
   @Prop({ default: 0 })
   followingCount: number;
+  
+  @Prop({ default: 0 })
+  postsCount: number;
 
   @Prop({ default: false })
   isPrivate: boolean;

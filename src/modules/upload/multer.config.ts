@@ -4,7 +4,7 @@ import { memoryStorage } from 'multer';
 
 /**
  * Returns Multer options that:
- *  - Store the file in memory (UploadService writes to disk with a UUID name)
+ *  - Store the file in memory (UploadService writes to disk with a uid-timestamp name)
  *  - Apply a generous max size guard (real per-context limits are in UploadService)
  *  - Reject obviously invalid MIME types early
  */
