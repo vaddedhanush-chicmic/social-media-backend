@@ -28,7 +28,7 @@ import { multerConfig } from '../upload/multer.config';
 
 @ApiTags('Posts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, ProfileCompleteGuard)
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}

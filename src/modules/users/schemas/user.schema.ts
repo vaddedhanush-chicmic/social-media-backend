@@ -38,6 +38,9 @@ export class User {
   @Prop({ default: false })
   isPrivate: boolean;
 
+  @Prop({ default: false })
+  isPremium: boolean;
+
   @Prop({ default: true })
   isActive: boolean;
 

@@ -14,17 +14,19 @@ import { FollowsModule } from './modules/follows/follows.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { PostsModule } from './modules/posts/posts.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import mongoConfig from './config/mongo.config';
 import uploadConfig from './config/upload.config';
 import giphyConfig from './config/giphy.config';
+import stripeConfig from './config/stripe.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, jwtConfig, mongoConfig, uploadConfig, giphyConfig],
+      load: [appConfig, jwtConfig, mongoConfig, uploadConfig, giphyConfig, stripeConfig],
     }),
     // Serve the uploads folder as static files at /uploads/*
     ServeStaticModule.forRootAsync({
@@ -47,6 +49,7 @@ import giphyConfig from './config/giphy.config';
     ChatModule,
     UploadModule,
     PostsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
