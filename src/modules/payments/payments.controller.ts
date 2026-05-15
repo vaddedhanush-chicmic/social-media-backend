@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -30,6 +31,16 @@ export class PaymentsController {
     @Body() dto: CreateCheckoutDto,
   ) {
     return this.paymentsService.createCheckout(userId, dto);
+  }
+
+  @ApiBearerAuth()
+  @Post('subscriptions')
+  @ApiOperation({ summary: 'Create a subscription with optional free trial' })
+  createSubscription(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: CreateSubscriptionDto,
+  ) {
+    return this.paymentsService.createSubscription(userId, dto);
   }
 
   @Public()
