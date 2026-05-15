@@ -88,8 +88,10 @@ export class UsersService {
     const isPrivate = user.isPrivate && !isOwnProfile && !isFollowing;
     
     // Privacy Logic: Hide certain fields if account is private and not following
-    const userFields = isOwnProfile ? 'username email isPrivate followersCount followingCount' : 'username isPrivate followersCount followingCount postsCount -_id';
-    
+    const userFields = isOwnProfile 
+      ? 'username email isPrivate followersCount followingCount postsCount isPremium' 
+      : 'username isPrivate followersCount followingCount postsCount isPremium -_id';    
+
     // If private, hide bio and other profile details
     const profileFields = isPrivate ? '-__v -isComplete -updatedAt -bio -socialLinks' : '-__v -isComplete -updatedAt';
 

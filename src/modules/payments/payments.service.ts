@@ -22,20 +22,15 @@ export class PaymentsService {
       { apiVersion: '2026-04-22.dahlia' },
     );
     this.webhookSecret = this.configService.get<string>('stripe.webhookSecret')!;
+    console.log('WEBHOOK SECRET:', this.webhookSecret); 
   }
 
   async createCheckout(userId: string, dto: CreateCheckoutDto) {
     const intent = await this.stripe.paymentIntents.create({
-        amount: dto.amount,
-        currency: this.configService.get<string>('stripe.currency') || 'inr',
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: 'never',
-        },
-        metadata: {
-          userId,
-          purpose: dto.purpose,
-        },
+      amount: dto.amount,
+      currency: 'inr',
+      automatic_payment_methods: { enabled: true },
+      metadata: { userId, purpose: dto.purpose },
     });
 
     await this.paymentsRepository.create({
