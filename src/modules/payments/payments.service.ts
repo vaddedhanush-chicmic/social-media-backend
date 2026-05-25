@@ -5,7 +5,7 @@ import { PaymentsRepository } from './payments.repository';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
-import { PaymentStatus } from './schemas/payment.schema';
+import { PaymentStatus, PaymentPurpose } from './schemas/payment.schema';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -23,7 +23,6 @@ export class PaymentsService {
             { apiVersion: '2026-04-22.dahlia' },
         );
         this.webhookSecret = this.configService.get<string>('stripe.webhookSecret')!;
-        console.log('WEBHOOK SECRET:', this.webhookSecret);
     }
 
     async createCheckout(userId: string, dto: CreateCheckoutDto) {
@@ -118,7 +117,7 @@ export class PaymentsService {
             setup_future_usage: 'off_session',
             metadata: {
                 userId,
-                purpose: 'subscription',
+                purpose: PaymentPurpose.PREMIUM_SUBSCRIPTION,
                 priceId: dto.priceId,
                 plan: dto.plan || '',
             },
@@ -130,12 +129,12 @@ export class PaymentsService {
             stripeClientSecret: intent.client_secret!,
             amount: price.unit_amount,
             currency: price.currency,
-            purpose: 'premium_subscription' as any,
+            purpose: PaymentPurpose.PREMIUM_SUBSCRIPTION,
             metadata: intent.metadata as Record<string, string>,
         });
 
         return {
-            subscriptionId: 'pending',
+            paymentIntentId: intent.id,
             clientSecret: intent.client_secret,
         };
     }
@@ -143,30 +142,26 @@ export class PaymentsService {
     private async fulfillPayment(intent: any) {
         const { userId, purpose } = intent.metadata;
 
-        if (purpose === 'premium_subscription') {
-            await this.usersService.update(userId, { isPremium: true });
-            console.log(`User ${userId} tagged as premium`);
-        }
-
-        if (purpose === 'subscription') {
-            // Payment succeeded — create the recurring subscription using the saved card
-            const paymentMethods = await this.stripe.paymentMethods.list({
-                customer: intent.customer as string,
-                type: 'card',
-            });
-
-            const defaultPm = paymentMethods.data[0]?.id;
-            if (defaultPm) {
-                const subscription = await this.stripe.subscriptions.create({
+        if (purpose === PaymentPurpose.PREMIUM_SUBSCRIPTION) {
+            // If the payment was made via createSubscription (has a saved customer & priceId),
+            // create the recurring Stripe Subscription using the saved payment method.
+            if (intent.customer && intent.metadata.priceId) {
+                const paymentMethods = await this.stripe.paymentMethods.list({
                     customer: intent.customer as string,
-                    items: [{ price: intent.metadata.priceId }],
-                    default_payment_method: defaultPm,
+                    type: 'card',
                 });
-                console.log(`Subscription ${subscription.id} created for user ${userId}`);
+
+                const defaultPm = paymentMethods.data[0]?.id;
+                if (defaultPm) {
+                    await this.stripe.subscriptions.create({
+                        customer: intent.customer as string,
+                        items: [{ price: intent.metadata.priceId }],
+                        default_payment_method: defaultPm,
+                    });
+                }
             }
 
             await this.usersService.update(userId, { isPremium: true });
-            console.log(`User ${userId} tagged as premium (subscription)`);
         }
     }
 }

@@ -38,6 +38,9 @@ export class User {
   @Prop({ default: false })
   isPrivate: boolean;
 
+  @Prop()
+  stripeCustomerId?: string;
+
   @Prop({ default: false })
   isPremium: boolean;
 

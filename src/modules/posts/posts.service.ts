@@ -166,13 +166,13 @@ export class PostsService {
   async likePost(postId: string, requesterId: string): Promise<void> {
     const post = await this.findOrThrow(postId);
     await this.assertCanView(post, requesterId);
-    await this.postsRepository.incrementLikes(postId);
+    await this.postsRepository.addLike(postId, requesterId);
   }
 
   async unlikePost(postId: string, requesterId: string): Promise<void> {
     const post = await this.findOrThrow(postId);
     await this.assertCanView(post, requesterId);
-    await this.postsRepository.decrementLikes(postId);
+    await this.postsRepository.removeLike(postId, requesterId);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

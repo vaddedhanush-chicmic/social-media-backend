@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Post, PostSchema } from './schemas/post.schema';
+import { Like, LikeSchema } from './schemas/like.schema';
 import { PostsRepository } from './posts.repository';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
@@ -10,7 +11,10 @@ import { FollowsModule } from '../follows/follows.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
+    MongooseModule.forFeature([
+      { name: Post.name, schema: PostSchema },
+      { name: Like.name, schema: LikeSchema },
+    ]),
     UploadModule,
     forwardRef(() => UsersModule),
     forwardRef(() => FollowsModule),

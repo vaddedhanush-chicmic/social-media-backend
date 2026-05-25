@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Req,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -51,7 +52,10 @@ export class PaymentsController {
     @Req() req: Request & { rawBody?: Buffer },
     @Headers('stripe-signature') signature: string,
   ) {
-    return this.paymentsService.handleWebhook(req.rawBody!, signature);
+    if (!req.rawBody) {
+      throw new BadRequestException('Missing raw body — ensure rawBody parsing is enabled');
+    }
+    return this.paymentsService.handleWebhook(req.rawBody, signature);
   }
 
   @ApiBearerAuth()
